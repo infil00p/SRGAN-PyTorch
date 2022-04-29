@@ -1,4 +1,4 @@
-# Copyright 2021 Dakewe Biotech Corporation. All Rights Reserved.
+# Copyright 2022 Dakewe Biotech Corporation. All Rights Reserved.
 # Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
 #   You may obtain a copy of the License at
@@ -11,97 +11,94 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+import random
 
-# ==============================================================================
-# File description: Realize the parameter configuration function of data set, model, training and verification code.
-# ==============================================================================
-import os
-
+import numpy as np
 import torch
-import torch.backends.cudnn as cudnn
-import torch.nn as nn
-import torch.optim as optim
-from torch.optim.lr_scheduler import StepLR
-from torch.utils.tensorboard import SummaryWriter
+from torch.backends import cudnn
 
-from model import ContentLoss
-from model import Discriminator
-from model import Generator
+# Random seed to maintain reproducible results
+random.seed(0)
+torch.manual_seed(0)
+np.random.seed(0)
+# Use GPU for training by default
+device = torch.device("cuda", 0)
+# Turning on when the image size does not change during training can speed up training
+cudnn.benchmark = True
+# Image magnification factor
+upscale_factor = 4
+# Current configuration parameter method
+mode = "train_srresnet"
+# Experiment name, easy to save weights and log files
+exp_name = "SRResNet_baseline"
 
-# ==============================================================================
-#                              Common configure
-# ==============================================================================
-torch.manual_seed(0)                       # Set random seed.
-upscale_factor   = 4                       # How many times the size of the high-resolution image in the data set is than the low-resolution image.
-device           = torch.device("cuda:0")  # Use the first GPU for processing by default.
-cudnn.benchmark  = True                    # If the dimension or type of the input data of the network does not change much, turn it on, otherwise turn it off.
-mode             = "train"                 # Run mode. Specific mode loads specific variables.
-exp_name         = "exp000"                # Experiment name.
+if mode == "train_srresnet":
+    # Dataset address
+    train_image_dir = "data/ImageNet/SRGAN/train"
+    valid_image_dir = "data/ImageNet/SRGAN/valid"
+    test_lr_image_dir = f"data/Set5/LRbicx{upscale_factor}"
+    test_hr_image_dir = f"data/Set5/GTmod12"
 
-# ==============================================================================
-#                              Train configure
-# ==============================================================================
-if mode == "train":
-    # Configure dataset.
-    train_dir             = "data/ImageNet/train"       # The address of the training dataset.
-    valid_dir             = "data/ImageNet/valid"       # The address of the validating dataset.
-    image_size            = 96                          # High-resolution image size in the training dataset.
-    batch_size            = 16                          # Dataset batch size.
+    image_size = 96
+    batch_size = 16
+    num_workers = 4
 
-    # Configure model.
-    discriminator         = Discriminator().to(device)  # Load the discriminator model.
-    generator             = Generator().to(device)      # Load the generator model.
+    # Incremental training and migration training
+    start_epoch = 0
+    resume = ""
 
-    # Resume training.
-    start_p_epoch         = 0                           # The number of initial iterations of the generator training phase. When set to 0, it means incremental training.
-    start_epoch           = 0                           # The number of initial iterations of the adversarial training phase. When set to 0, it means incremental training.
-    resume                = False                       # Set to `True` to continue training from the previous training progress.
-    resume_p_weight       = ""                          # Restore the weight of the generator model during generator training.
-    resume_d_weight       = ""                          # Restore the weight of the generator model during the training of the adversarial network.
-    resume_g_weight       = ""                          # Restore the weight of the discriminator model during the training of the adversarial network.
+    # Total num epochs
+    epochs = 44
 
-    # Train epochs.
-    p_epochs              = 46                          # The total number of epochs of the generator training phase.
-    epochs                = 10                          # The total number of epochs of the adversarial training phase.
+    # Optimizer parameter
+    model_lr = 1e-4
+    model_betas = (0.9, 0.999)
 
-    # Loss function.
-    psnr_criterion        = nn.MSELoss().to(device)     # PSNR metrics.
-    pixel_criterion       = nn.MSELoss().to(device)     # Pixel loss.
-    content_criterion     = ContentLoss().to(device)    # Content loss.
-    adversarial_criterion = nn.BCELoss().to(device)     # Adversarial loss.
-    # Perceptual loss function weight.
-    pixel_weight          = 0.01
-    content_weight        = 1.0
-    adversarial_weight    = 0.001
+    print_frequency = 100
 
-    # Optimizer.
-    p_optimizer           = optim.Adam(generator.parameters(),     0.0001, (0.9, 0.999))  # Generator model learning rate during generator network training.
-    d_optimizer           = optim.Adam(discriminator.parameters(), 0.0001, (0.9, 0.999))  # Discriminator learning rate during adversarial network training.
-    g_optimizer           = optim.Adam(generator.parameters(),     0.0001, (0.9, 0.999))  # Generator learning rate during adversarial network training.
+if mode == "train_srgan":
+    # Dataset address
+    train_image_dir = "data/ImageNet/SRGAN/train"
+    valid_image_dir = "data/ImageNet/SRGAN/valid"
+    test_lr_image_dir = f"data/Set5/LRbicx{upscale_factor}"
+    test_hr_image_dir = f"data/Set5/GTmod12"
 
-    # Scheduler.
-    d_scheduler           = StepLR(d_optimizer, epochs // 2, 0.1)  # Discriminator model scheduler during adversarial network training.
-    g_scheduler           = StepLR(g_optimizer, epochs // 2, 0.1)  # Generator model scheduler during adversarial network training.
+    image_size = 96
+    batch_size = 16
+    num_workers = 4
 
-    # Training log.
-    writer                = SummaryWriter(os.path.join("samples",  "logs", exp_name))
+    # Incremental training and migration training
+    start_epoch = 0
+    resume = "results/SRResNet_baseline/g_last.pth.tar"
+    resume_d = ""
+    resume_g = ""
 
-    # Additional variables.
-    exp_dir1 = os.path.join("samples", exp_name)
-    exp_dir2 = os.path.join("results", exp_name)
+    # Total num epochs
+    epochs = 9
 
-# ==============================================================================
-#                              Validate configure
-# ==============================================================================
+    # Feature extraction layer parameter configuration
+    feature_model_extractor_node = "features.35"
+    feature_model_normalize_mean = [0.485, 0.456, 0.406]
+    feature_model_normalize_std = [0.229, 0.224, 0.225]
+
+    # Loss function weight
+    content_weight = 1.0
+    adversarial_weight = 0.001
+
+    # Optimizer parameter
+    model_lr = 1e-4
+    model_betas = (0.9, 0.999)
+
+    # LR scheduler parameter
+    lr_scheduler_step_size = epochs // 2
+    lr_scheduler_gamma = 0.1
+
+    print_frequency = 100
+
 if mode == "valid":
-    # Additional variables.
-    exp_dir    = os.path.join("results", "test", exp_name)
+    # Test data address
+    lr_dir = f"data/Set5/LRbicx{upscale_factor}"
+    sr_dir = f"results/test/{exp_name}"
+    hr_dir = f"data/Set5/GTmod12"
 
-    # Load model.
-    model      = Generator().to(device)
-    model_path = f"results/{exp_name}/g-best.pth"
-
-    # Test data address.
-    lr_dir     = f"data/Set5/LRbicx4"
-    sr_dir     = f"results/test/{exp_name}"
-    hr_dir     = f"data/Set5/GTmod12"
+    model_path = f"results/{exp_name}/g_last.pth.tar"

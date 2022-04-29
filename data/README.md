@@ -1,35 +1,23 @@
 # Usage
 
-```bash
-# Default use DIV2K dataset.
-$ bash download_dataset.sh
-```
+## Step1: Download datasets
 
-## Training Dataset directory structure
+Contains DIV2K, DIV8K, Flickr2K, OST, T91, Set5, Set14, BSDS100 and BSDS200, etc.
 
-When training DIV2K, the dataset should be placed in the following directory.
+- [Google Driver](https://drive.google.com/drive/folders/1A6lzGeQrFMxPqJehK9s37ce-tPDj20mD?usp=sharing)
+- [Baidu Driver](https://pan.baidu.com/s/1o-8Ty_7q6DiS3ykLU09IVg?pwd=llot)
 
-```text
-- DIV2K
-    - train
-        - 0000.png
-        - 0001.png
-        - 0002.png
-        - ...
-    - valid 
-        - 1000.png
-        - 1001.png
-        - 1002.png
-        - ...
-```
-
-## Testing Dataset directory structure
-
-If you need to test Set5, Set14, place the dataset in the following way.
-
-### Set 5
+## Step2: Prepare the dataset in the following format
 
 ```text
+# Train dataset struct
+- ImageNet
+    - original
+        - image001.JPEG
+        - image002.bmp
+        ...
+
+# Test dataset struct
 - Set5
     - GTmod12
         - baby.png
@@ -40,3 +28,34 @@ If you need to test Set5, Set14, place the dataset in the following way.
         - bird.png
         - ...
 ```
+
+## Step3: Preprocess the train dataset
+
+```bash
+cd <SRGAN-PyTorch-master>/scripts
+python run.py
+```
+
+## Step4: Check that the final dataset directory schema is completely correct
+
+```text
+# Train dataset
+- ImageNet
+    - SRGAN
+        - train
+        - valid
+        - original
+
+# Test dataset
+- Set5
+    - GTmod12
+        - baby.png
+        - bird.png
+        - ...
+    - LRbicx4
+        - baby.png
+        - bird.png
+        - ...
+
+```
+
